@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # FRRouting Router 1 - Core Router with OSPF/BGP
+  router1:
+    image: frrouting/frr:latest
+    container_name: noc_router1
+    hostname: router1
+    privileged: true
+    volumes:
+      - ./config/router1:/etc/frr
+    networks:
+      core_network:
+        ipv4_address: 10.0.1.1
+      edge_network:
+        ipv4_address: 10.0.2.1
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+
+  # FRRouting Router 2 - Edge Router with OSPF
+  router2:
+    image: frrouting/frr:latest
+    container_name: noc_router2
+    hostname: router2
+    privileged: true
+    volumes:
+      - ./config/router2:/etc/frr
+    networks:
+      edge_network:
+        ipv4_address: 10.0.2.2
+      client_network:
+        ipv4_address: 10.0.3.1
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+
+  # FreeRADIUS Server for Authentication
+  radius:
+    image: freeradius/freeradius-server:latest
+    container_name: noc_radius
+    hostname: radius
+    volumes:
+      - ./config/radius:/etc/raddb
+      - ./logs/radius:/var/log/freeradius
+    networks:
+      core_network:
+        ipv4_address: 10.0.1.10
+    ports:
+      - "1812:1812/udp"  # RADIUS Authentication
+      - "1813:1813/udp"  # RADIUS Accounting
+
+  # Network Scanner/Monitor Host
+  scanner:
+    build: ./scanner
+    container_name: noc_scanner
+    hostname: scanner
+    privileged: true
+    volumes:
+      - ./scanner:/app
+      - ./logs/scanner:/var/log/scanner
+      - ./data:/data
+    networks:
+      core_network:
+        ipv4_address: 10.0.1.20
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+  # Web Dashboard (SvelteKit/Node)
+  dashboard:
+    build: ./dashboard
+    container_name: noc_dashboard
+    hostname: dashboard
+    volumes:
+      - ./dashboard:/app
+      - ./data:/data:ro
+    networks:
+      core_network:
+        ipv4_address: 10.0.1.30
+    ports:
+      - "5173:5173"  # Vite dev server
+      - "3000:3000"  # Production server
+    environment:
+      - NODE_ENV=development
+
+  # Client 1 - Simulated workstation
+  client1:
+    image: alpine:latest
+    container_name: noc_client1
+    hostname: client1
+    command: sh -c "apk add --no-cache iperf3 tcpdump curl && tail -f /dev/null"
+    networks:
+      client_network:
+        ipv4_address: 10.0.3.10
+    cap_add:
+      - NET_ADMIN
+
+  # Client 2 - Simulated workstation
+  client2:
+    image: alpine:latest
+    container_name: noc_client2
+    hostname: client2
+    command: sh -c "apk add --no-cache iperf3 tcpdump curl && tail -f /dev/null"
+    networks:
+      client_network:
+        ipv4_address: 10.0.3.11
+    cap_add:
+      - NET_ADMIN
+
+  # DNS/DHCP Server (dnsmasq)
+  dns:
+    image: jpillora/dnsmasq
+    container_name: noc_dns
+    hostname: dns
+    networks:
+      core_network:
+        ipv4_address: 10.0.1.40
+    ports:
+      - "53:53/udp"
+    volumes:
+      - ./config/dns/dnsmasq.conf:/etc/dnsmasq.conf
+    cap_add:
+      - NET_ADMIN
+
+networks:
+  core_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24
+          gateway: 10.0.1.254
+  edge_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.2.0/24
+          gateway: 10.0.2.254
+  client_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.3.0/24
+          gateway: 10.0.3.254
