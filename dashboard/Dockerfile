@@ -9,11 +9,11 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy package files
+# Copy package files first
 COPY package*.json ./
 
-# Install Node dependencies
-RUN npm install
+# Install Node dependencies with verbose logging
+RUN npm install --verbose
 
 # Copy application code
 COPY . .
@@ -22,4 +22,4 @@ COPY . .
 EXPOSE 5173 3000
 
 # Development mode by default
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
