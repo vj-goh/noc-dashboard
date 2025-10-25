@@ -416,3 +416,39 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Node modules
+
+package-lock.json
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Logs
+logs/
+
+# Data files
+data/
+*.pcap
+
+# Docker volumes
+docker-compose.override.yml
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build files
+dist/
+build/
+*.egg-info/
