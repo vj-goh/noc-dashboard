@@ -1,0 +1,37 @@
+# FreeRADIUS Users File
+# Format: username  Auth-Type := Local, User-Password == "password"
+
+# Network Administrator Account
+admin Cleartext-Password := "admin123"
+    Reply-Message = "Welcome Network Administrator",
+    Service-Type = Administrative-User
+
+# Network Engineer Account
+vjnetwork Cleartext-Password := "mafioso1"
+    Reply-Message = "Welcome VJ - Network Engineer",
+    Service-Type = NAS-Prompt-User,
+    Cisco-AVPair = "shell:priv-lvl=15"
+
+# Guest User
+guest Cleartext-Password := "guest123"
+    Reply-Message = "Welcome Guest User",
+    Service-Type = Login-User
+
+# Test User 1
+testuser1 Cleartext-Password := "test123"
+    Reply-Message = "Test User 1 Authenticated",
+    Service-Type = Framed-User
+
+# Test User 2
+testuser2 Cleartext-Password := "test456"
+    Reply-Message = "Test User 2 Authenticated",
+    Service-Type = Framed-User
+
+# Router Authentication Account
+router_auth Cleartext-Password := "router_pass"
+    Reply-Message = "Router Authentication Successful",
+    Service-Type = NAS-Prompt-User
+
+# DEFAULT entry - reject all others
+DEFAULT Auth-Type := Reject
+    Reply-Message = "Authentication Failed - Invalid Credentials"
