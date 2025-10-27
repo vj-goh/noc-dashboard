@@ -37,12 +37,10 @@ services:
 
   # FreeRADIUS Server for Authentication
   radius:
-    image: freeradius/freeradius-server:latest
+    build: ./config/radius
     container_name: noc_radius
     hostname: radius
     volumes:
-      - ./config/radius/clients.conf:/etc/raddb/clients.conf:ro
-      - ./config/radius/users:/etc/raddb/mods-config/files/authorize:ro
       - ./logs/radius:/var/log/freeradius
     networks:
       core_network:
@@ -50,7 +48,6 @@ services:
     ports:
       - "1812:1812/udp"  # RADIUS Authentication
       - "1813:1813/udp"  # RADIUS Accounting
-    command: -X
 
   # Network Scanner/Monitor Host
   scanner:
