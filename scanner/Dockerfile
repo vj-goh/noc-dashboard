@@ -8,11 +8,17 @@ RUN apt-get update && apt-get install -y \
     tcpdump \
     net-tools \
     iputils-ping \
+    iputils-tracepath \
+    traceroute \
+    mtr-tiny \
     iproute2 \
     curl \
     wget \
     netcat-traditional \
     iperf3 \
+    freeradius-utils \
+    dnsutils \
+    telnet \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python packages
