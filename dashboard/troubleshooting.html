@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NOC Dashboard - Troubleshooting Suite</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="header">
+        <h1>🔧 Network Troubleshooting Suite</h1>
+        <div class="subtitle">OSI Model Layer-by-Layer Diagnostics</div>
+    </div>
+
+    <div class="container">
+        <!-- Layer Health Overview -->
+        <div class="section">
+            <h2>Network Health Status</h2>
+            <div class="layer-grid">
+                <div class="layer-card" id="layer7">
+                    <div class="layer-number">L7</div>
+                    <div class="layer-name">Application</div>
+                    <div class="layer-status" id="l7-status">✅ Healthy</div>
+                </div>
+                <div class="layer-card" id="layer6">
+                    <div class="layer-number">L6</div>
+                    <div class="layer-name">Presentation</div>
+                    <div class="layer-status" id="l6-status">✅ Healthy</div>
+                </div>
+                <div class="layer-card" id="layer5">
+                    <div class="layer-number">L5</div>
+                    <div class="layer-name">Session</div>
+                    <div class="layer-status" id="l5-status">✅ Healthy</div>
+                </div>
+                <div class="layer-card" id="layer4">
+                    <div class="layer-number">L4</div>
+                    <div class="layer-name">Transport</div>
+                    <div class="layer-status" id="l4-status">✅ Healthy</div>
+                </div>
+                <div class="layer-card" id="layer3">
+                    <div class="layer-number">L3</div>
+                    <div class="layer-name">Network</div>
+                    <div class="layer-status" id="l3-status">✅ Healthy</div>
+                </div>
+                <div class="layer-card" id="layer2">
+                    <div class="layer-number">L2</div>
+                    <div class="layer-name">Data Link</div>
+                    <div class="layer-status" id="l2-status">✅ Healthy</div>
+                </div>
+                <div class="layer-card" id="layer1">
+                    <div class="layer-number">L1</div>
+                    <div class="layer-name">Physical</div>
+                    <div class="layer-status" id="l1-status">✅ Healthy</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnostic Tools -->
+        <div class="section">
+            <h2>Diagnostic Tools</h2>
+            <div class="tool-grid">
+                <!-- Connectivity Test -->
+                <div class="tool-card">
+                    <h3>🔌 Connectivity Test</h3>
+                    <input type="text" id="ping-target" placeholder="IP Address (e.g., 10.0.1.1)" class="input-field">
+                    <button class="btn" onclick="runPing()">Ping</button>
+                    <div class="tool-output" id="ping-output"></div>
+                </div>
+
+                <!-- Route Trace -->
+                <div class="tool-card">
+                    <h3>🗺️ Route Trace</h3>
+                    <input type="text" id="trace-target" placeholder="IP Address" class="input-field">
+                    <button class="btn" onclick="runTraceroute()">Traceroute</button>
+                    <div class="tool-output" id="trace-output"></div>
+                </div>
+
+                <!-- Port Check -->
+                <div class="tool-card">
+                    <h3>🚪 Port Scanner</h3>
+                    <input type="text" id="port-host" placeholder="Host" class="input-field">
+                    <input type="text" id="port-number" placeholder="Port (e.g., 443)" class="input-field">
+                    <button class="btn" onclick="checkPort()">Check Port</button>
+                    <div class="tool-output" id="port-output"></div>
+                </div>
+
+                <!-- DNS Lookup -->
+                <div class="tool-card">
+                    <h3>🔍 DNS Lookup</h3>
+                    <input type="text" id="dns-query" placeholder="Hostname" class="input-field">
+                    <button class="btn" onclick="runDNSLookup()">Resolve</button>
+                    <div class="tool-output" id="dns-output"></div>
+                </div>
+
+                <!-- ARP Table -->
+                <div class="tool-card">
+                    <h3>📖 ARP Table</h3>
+                    <button class="btn" onclick="showARPTable()">View ARP Cache</button>
+                    <div class="tool-output" id="arp-output"></div>
+                </div>
+
+                <!-- Routing Table -->
+                <div class="tool-card">
+                    <h3>🛣️ Routing Table</h3>
+                    <select id="router-select" class="input-field">
+                        <option value="router1">Router 1</option>
+                        <option value="router2">Router 2</option>
+                    </select>
+                    <button class="btn" onclick="showRoutingTable()">View Routes</button>
+                    <div class="tool-output" id="route-output"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Issues -->
+        <div class="section">
+            <h2>🚨 Active Issues</h2>
+            <div id="issues-list" class="issues-container">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Troubleshooting Wizard -->
+        <div class="section">
+            <h2>🧙 Troubleshooting Wizard</h2>
+            <div class="wizard-container">
+                <p><strong>What's the problem?</strong></p>
+                <select id="problem-type" class="input-field" onchange="updateWizard()">
+                    <option value="">Select issue type...</option>
+                    <option value="no-connectivity">No Connectivity</option>
+                    <option value="slow-performance">Slow Performance</option>
+                    <option value="intermittent">Intermittent Connection</option>
+                    <option value="service-down">Service Not Responding</option>
+                    <option value="auth-failure">Authentication Failure</option>
+                </select>
+                <div id="wizard-steps" class="wizard-steps"></div>
+            </div>
+        </div>
+
+        <!-- Network Topology Map -->
+        <div class="section">
+            <h2>🗺️ Network Topology</h2>
+            <div class="topology-visual" id="topology-map">
+                <svg width="100%" height="500" id="topology-svg">
+                    <!-- Network topology will be drawn here -->
+                </svg>
+            </div>
+        </div>
+
+        <!-- Performance Metrics -->
+        <div class="section">
+            <h2>📊 Performance Metrics</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Average Latency</div>
+                    <div class="metric-value" id="avg-latency">< 5ms</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Packet Loss</div>
+                    <div class="metric-value" id="packet-loss">0%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">OSPF Neighbors</div>
+                    <div class="metric-value" id="ospf-neighbors">2/2</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">BGP Sessions</div>
+                    <div class="metric-value" id="bgp-sessions">1/1</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">RADIUS Auth Success</div>
+                    <div class="metric-value" id="radius-success">100%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">DNS Resolution Time</div>
+                    <div class="metric-value" id="dns-time">< 50ms</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Packet Capture -->
+        <div class="section">
+            <h2>📦 Packet Capture</h2>
+            <div class="capture-controls">
+                <select id="capture-interface" class="input-field">
+                    <option value="any">All Interfaces</option>
+                    <option value="eth0">Core Network</option>
+                    <option value="eth1">Edge Network</option>
+                </select>
+                <input type="text" id="capture-filter" placeholder="Filter (e.g., port 443)" class="input-field">
+                <button class="btn" onclick="startCapture()">Start Capture</button>
+                <button class="btn" onclick="stopCapture()">Stop</button>
+            </div>
+            <div class="capture-output" id="capture-results"></div>
+        </div>
+    </div>
+
+    <script src="troubleshooting.js"></script>
+</body>
+</html>
