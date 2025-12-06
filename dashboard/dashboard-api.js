@@ -2,7 +2,7 @@
 // Calls the noc-dashboard-api backend for real data
 
 // API Configuration
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:8001/api';
 
 let currentScanData = null;
 let refreshInterval = null;

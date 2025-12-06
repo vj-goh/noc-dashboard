@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # FRRouting Router 1 - Core Router with OSPF/BGP
+  # Core Network Router
   router1:
     image: frrouting/frr:latest
     container_name: noc_router1
@@ -10,15 +10,16 @@ services:
     volumes:
       - ./config/router1:/etc/frr
     networks:
-      core_network:
-        ipv4_address: 10.0.1.1
-      edge_network:
-        ipv4_address: 10.0.2.1
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
+      - core_network
+      - edge_network
+    command: >
+      sh -c "chown -R frr:frr /etc/frr &&
+             chmod 640 /etc/frr/frr.conf /etc/frr/daemons /etc/frr/vtysh.conf &&
+             /usr/lib/frr/frrinit.sh start &&
+             tail -f /dev/null"
+    restart: unless-stopped
 
-  # FRRouting Router 2 - Edge Router with OSPF
+  # Edge Network Router
   router2:
     image: frrouting/frr:latest
     container_name: noc_router2
@@ -27,100 +28,144 @@ services:
     volumes:
       - ./config/router2:/etc/frr
     networks:
-      edge_network:
-        ipv4_address: 10.0.2.2
-      client_network:
-        ipv4_address: 10.0.3.1
-    cap_add:
-      - NET_ADMIN
-      - SYS_ADMIN
+      - edge_network
+      - client_network
+    command: >
+      sh -c "chown -R frr:frr /etc/frr &&
+             chmod 640 /etc/frr/frr.conf /etc/frr/daemons /etc/frr/vtysh.conf &&
+             /usr/lib/frr/frrinit.sh start &&
+             tail -f /dev/null"
+    restart: unless-stopped
 
-  # FreeRADIUS Server for Authentication
+  # RADIUS Server - Fixed to use custom Dockerfile
   radius:
-    build: ./config/radius
+    build:
+      context: ./config/radius
+      dockerfile: Dockerfile
     container_name: noc_radius
     hostname: radius
-    volumes:
-      - ./logs/radius:/var/log/freeradius
     networks:
       core_network:
         ipv4_address: 10.0.1.10
     ports:
-      - "1812:1812/udp"  # RADIUS Authentication
-      - "1813:1813/udp"  # RADIUS Accounting
+      - "11812:1812/udp"
+      - "11813:1813/udp"
+    restart: unless-stopped
 
-  # Network Scanner/Monitor Host
+  # Network Scanner
   scanner:
-    build: ./scanner
+    build:
+      context: ./scanner
+      dockerfile: Dockerfile
     container_name: noc_scanner
     hostname: scanner
-    privileged: true
     volumes:
       - ./scanner:/app
-      - ./logs/scanner:/var/log/scanner
-      - ./data:/data
+      - scan-data:/data
     networks:
       core_network:
         ipv4_address: 10.0.1.20
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
+      edge_network:
+        ipv4_address: 10.0.2.20
+      client_network:
+        ipv4_address: 10.0.3.20
+    privileged: true
+    restart: unless-stopped
 
-  # Web Dashboard (SvelteKit/Node)
-  dashboard:
-    build: ./dashboard
-    container_name: noc_dashboard
-    hostname: dashboard
+  # DNS Server - Using dnsmasq instead of BIND9
+  dns:
+    image: strm/dnsmasq:latest
+    container_name: noc_dns
+    hostname: dns
     volumes:
-      - ./dashboard:/app
-      - ./data:/data:ro
+      - ./config/dns/dnsmasq.conf:/etc/dnsmasq.conf:ro
     networks:
       core_network:
-        ipv4_address: 10.0.1.30
-    ports:
-      - "5173:5173"  # Vite dev server
-      - "3000:3000"  # Production server
-    environment:
-      - NODE_ENV=development
+        ipv4_address: 10.0.1.40
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
 
-  # Client 1 - Simulated workstation
+  # Client 1
   client1:
     image: alpine:latest
     container_name: noc_client1
     hostname: client1
-    command: sh -c "apk add --no-cache iperf3 tcpdump curl && tail -f /dev/null"
     networks:
       client_network:
         ipv4_address: 10.0.3.10
-    cap_add:
-      - NET_ADMIN
+    command: tail -f /dev/null
+    restart: unless-stopped
 
-  # Client 2 - Simulated workstation
+  # Client 2
   client2:
     image: alpine:latest
     container_name: noc_client2
     hostname: client2
-    command: sh -c "apk add --no-cache iperf3 tcpdump curl && tail -f /dev/null"
     networks:
       client_network:
         ipv4_address: 10.0.3.11
-    cap_add:
-      - NET_ADMIN
+    command: tail -f /dev/null
+    restart: unless-stopped
 
-  # DNS/DHCP Server (dnsmasq)
-  dns:
-    image: jpillora/dnsmasq
-    container_name: noc_dns
-    hostname: dns
+  # NOC Dashboard API
+  api:
+    build:
+      context: ../noc-dashboard-api
+      dockerfile: Dockerfile
+    container_name: noc_api
+    hostname: api
+    ports:
+      - "8001:8000"
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock
+      - ../noc-dashboard-api/app:/app/app
+      - scan-data:/data
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - DEBUG=true
+      - ROUTER1_CONTAINER=noc_router1
+      - ROUTER2_CONTAINER=noc_router2
+      - SCANNER_CONTAINER=noc_scanner
+      - RADIUS_CONTAINER=noc_radius
+      - DNS_CONTAINER=noc_dns
     networks:
       core_network:
-        ipv4_address: 10.0.1.40
+        ipv4_address: 10.0.1.50
+    depends_on:
+      - router1
+      - router2
+      - scanner
+      - radius
+      - dns
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  # Dashboard Frontend - FIXED API URL!
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: noc_dashboard
+    hostname: dashboard
     ports:
-      - "53:53/udp"
+      - "5174:5173"
+      - "3000:3000"
     volumes:
-      - ./config/dns/dnsmasq.conf:/etc/dnsmasq.conf
-    cap_add:
-      - NET_ADMIN
+      - ./dashboard:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8001/api  # ← FIXED! Was 8000, now 8001
+    networks:
+      core_network:
+        ipv4_address: 10.0.1.30
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  scan-data:
 
 networks:
   core_network:
@@ -128,16 +173,13 @@ networks:
     ipam:
       config:
         - subnet: 10.0.1.0/24
-          gateway: 10.0.1.254
   edge_network:
     driver: bridge
     ipam:
       config:
         - subnet: 10.0.2.0/24
-          gateway: 10.0.2.254
   client_network:
     driver: bridge
     ipam:
       config:
         - subnet: 10.0.3.0/24
-          gateway: 10.0.3.254
