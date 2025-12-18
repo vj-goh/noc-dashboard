@@ -210,36 +210,54 @@ class NetworkScanner:
         
         return routing_info
     
-    def capture_packets(self, interface='eth0', duration=10, filter_expr=''):
+    def capture_packets(self, interface='eth0', duration=10, filter_expr='', output_file=None):
         """
-        Capture network packets for analysis
-        Similar to Wireshark but programmatic
+        Capture network packets using tcpdump
+        Returns path to PCAP file for download
         """
-        logger.info(f"Starting packet capture on {interface} for {duration} seconds")
+        logger.info(f"Starting packet capture on {interface} for {duration}s")
         
-        capture_file = DATA_DIR / f"capture_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pcap"
+        if output_file is None:
+            output_file = DATA_DIR / f"capture_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pcap"
+        else:
+            output_file = DATA_DIR / output_file
         
         try:
-            # Use tcpdump for packet capture
             cmd = [
                 'tcpdump',
                 '-i', interface,
-                '-w', str(capture_file),
+                '-w', str(output_file),
                 '-G', str(duration),
-                '-W', '1'
+                '-W', '1'  # Keep 1 file
             ]
             
             if filter_expr:
-                cmd.append(filter_expr)
-                
-            subprocess.run(cmd, timeout=duration + 5)
+                cmd.extend(['-f', filter_expr])
             
-            logger.info(f"Packet capture saved to {capture_file}")
-            return str(capture_file)
+            subprocess.run(cmd, timeout=duration + 5, check=True)
             
+            logger.info(f"Packet capture saved: {output_file}")
+            return {
+                'success': True,
+                'file': str(output_file),
+                'filename': output_file.name,
+                'size_bytes': output_file.stat().st_size
+            }
         except Exception as e:
             logger.error(f"Packet capture failed: {e}")
-            return None
+            return {'success': False, 'error': str(e)}
+    
+    def list_captures(self):
+        """List all available PCAP files"""
+        pcaps = list(DATA_DIR.glob('*.pcap'))
+        return [
+            {
+                'filename': p.name,
+                'size_bytes': p.stat().st_size,
+                'created': datetime.fromtimestamp(p.stat().st_ctime).isoformat()
+            }
+            for p in pcaps
+        ]
     
     def full_network_scan(self):
         """

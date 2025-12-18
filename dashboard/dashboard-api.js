@@ -5,6 +5,7 @@
 
 const API_BASE_URL = 'http://localhost:8001/api';
 let isScanning = false;
+let currentScanData = null;
 
 // ============================================================================
 // INITIALIZATION
@@ -54,6 +55,7 @@ async function loadScanData() {
         const data = await response.json();
         
         if (data.success && data.hosts.length > 0) {
+            currentScanData = data;
             displayScanResults(data);
             updateStats(data);
             addLog(`Scan loaded: ${data.hosts.length} hosts discovered`, 'info');
@@ -424,10 +426,47 @@ async function testRadius() {
 // ============================================================================
 
 function showTopology() {
-    addLog('Loading network topology...', 'info');
-    // This would draw the network topology
-    // For now, just show a message
-    alert('Network topology visualization coming soon!\n\nThe network includes:\n- 2 Routers (OSPF/BGP)\n- 1 RADIUS Server\n- 1 DNS Server\n- 1 Scanner\n- 2 Client machines');
+    addLog('Generating network topology visualization...', 'info');
+    
+    const canvas = document.getElementById('topologyCanvas');
+    canvas.innerHTML = `
+        <div style="padding: 20px; text-align: center;">
+            <h3 style="color: #00ff88; margin-bottom: 20px;">Network Topology Map</h3>
+            <svg width="100%" height="360" style="background: rgba(0,0,0,0.2); border-radius: 8px;">
+                <!-- Core Network -->
+                <circle cx="300" cy="180" r="60" fill="rgba(0,255,136,0.2)" stroke="#00ff88" stroke-width="2"/>
+                <text x="300" y="180" text-anchor="middle" fill="#00ff88" font-size="12">Core Network</text>
+                <text x="300" y="195" text-anchor="middle" fill="#888" font-size="10">10.0.1.0/24</text>
+                
+                <!-- Edge Network -->
+                <circle cx="500" cy="180" r="50" fill="rgba(100,150,255,0.2)" stroke="#8af" stroke-width="2"/>
+                <text x="500" y="180" text-anchor="middle" fill="#8af" font-size="12">Edge Network</text>
+                <text x="500" y="195" text-anchor="middle" fill="#888" font-size="10">10.0.2.0/24</text>
+                
+                <!-- Client Network -->
+                <circle cx="700" cy="180" r="50" fill="rgba(255,200,0,0.2)" stroke="#fc0" stroke-width="2"/>
+                <text x="700" y="180" text-anchor="middle" fill="#fc0" font-size="12">Client Network</text>
+                <text x="700" y="195" text-anchor="middle" fill="#888" font-size="10">10.0.3.0/24</text>
+                
+                <!-- Connections -->
+                <line x1="360" y1="180" x2="450" y2="180" stroke="#00ff88" stroke-width="2" stroke-dasharray="5,5"/>
+                <line x1="550" y1="180" x2="650" y2="180" stroke="#8af" stroke-width="2" stroke-dasharray="5,5"/>
+                
+                <!-- Router Icons -->
+                <rect x="280" y="240" width="40" height="30" fill="rgba(0,255,136,0.3)" stroke="#00ff88" rx="3"/>
+                <text x="300" y="258" text-anchor="middle" fill="#fff" font-size="10">R1</text>
+                
+                <rect x="480" y="240" width="40" height="30" fill="rgba(100,150,255,0.3)" stroke="#8af" rx="3"/>
+                <text x="500" y="258" text-anchor="middle" fill="#fff" font-size="10">R2</text>
+            </svg>
+            <p style="color: #888; margin-top: 15px; font-size: 0.9em;">
+                Topology shows ${(currentScanData && Array.isArray(currentScanData.networks_scanned)) ? currentScanData.networks_scanned.length : 0} networks 
+                with ${currentScanData ? currentScanData.summary.total_hosts : 0} discovered hosts
+            </p>
+        </div>
+    `;
+    
+    addLog('Topology visualization generated', 'info');
 }
 
 // ============================================================================
@@ -537,4 +576,126 @@ if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initDashboard);
 } else {
     initDashboard();
+}
+
+/**
+ * Network Issue Simulator
+ * Simulates failures for troubleshooting game mode
+ */
+
+const SIMULATED_ISSUES = {
+    'bgp-down': {
+        name: 'BGP Session Down',
+        severity: 'critical',
+        affectedServices: ['router2-reachability'],
+        description: 'BGP peer 10.0.2.2 is not responding',
+        expectedDiagnosis: 'port-check-179' // User should check BGP port
+    },
+    'radius-failure': {
+        name: 'RADIUS Authentication Failure',
+        severity: 'high',
+        affectedServices: ['authentication'],
+        description: 'RADIUS server not responding to auth requests',
+        expectedDiagnosis: 'radius-test'
+    },
+    'dns-timeout': {
+        name: 'DNS Resolution Timeout',
+        severity: 'medium',
+        affectedServices: ['name-resolution'],
+        description: 'DNS queries timing out (>2000ms)',
+        expectedDiagnosis: 'dns-lookup'
+    },
+    'packet-loss': {
+        name: 'High Packet Loss on Link',
+        severity: 'high',
+        affectedServices: ['10.0.2.0/24'],
+        description: '25% packet loss detected between routers',
+        expectedDiagnosis: 'ping-test'
+    }
+};
+
+let activeIssues = [];
+
+/**
+ * Start a troubleshooting scenario
+ */
+function startTroubleshootingScenario(issueType) {
+    const issue = SIMULATED_ISSUES[issueType];
+    if (!issue) return;
+    
+    activeIssues.push({
+        ...issue,
+        id: `${issueType}-${Date.now()}`,
+        startTime: Date.now(),
+        solved: false
+    });
+    
+    addLog(`🚨 Issue detected: ${issue.name}`, 'error');
+    
+    // Modify API responses based on active issues
+    patchAPIResponses(issueType);
+}
+
+/**
+ * Patch API responses to simulate the issue
+ */
+function patchAPIResponses(issueType) {
+    // Save original fetch
+    const originalFetch = window.fetch;
+    
+    window.fetch = async function(...args) {
+        const response = await originalFetch.apply(this, args);
+        const clone = response.clone();
+        
+        // Intercept and modify responses based on issue
+        if (issueType === 'bgp-down' && args[0].includes('bgp/summary')) {
+            return new Response(JSON.stringify({
+                success: true,
+                peers: [{ state: 'Idle', ip: '10.0.2.2' }]
+            }));
+        }
+        
+        if (issueType === 'radius-failure' && args[0].includes('radius/test')) {
+            return new Response(JSON.stringify({
+                success: false,
+                authenticated: false,
+                message: 'RADIUS server unreachable (timeout)'
+            }));
+        }
+        
+        if (issueType === 'dns-timeout' && args[0].includes('dns-lookup')) {
+            return new Response(JSON.stringify({
+                success: false,
+                resolved: false,
+                query_time: 5000 // Simulate timeout
+            }));
+        }
+        
+        if (issueType === 'packet-loss' && args[0].includes('ping')) {
+            return new Response(JSON.stringify({
+                success: true,
+                packet_loss_pct: 25,
+                avg_rtt: 45
+            }));
+        }
+        
+        return clone;
+    };
+}
+
+/**
+ * Check if user fixed the issue
+ */
+function validateIssueFix(diagnosisType) {
+    const issue = activeIssues[activeIssues.length - 1];
+    if (!issue) return false;
+    
+    if (issue.expectedDiagnosis === diagnosisType) {
+        issue.solved = true;
+        addLog(`✅ Correct diagnosis! ${issue.name} requires: ${diagnosisType}`, 'info');
+        return true;
+    } else {
+        addLog(`❌ Not the right diagnostic. Try: ${issue.expectedDiagnosis}`, 'warning');
+        return false;
+    }
 }

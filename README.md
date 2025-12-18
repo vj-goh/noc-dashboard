@@ -66,7 +66,7 @@ A comprehensive network monitoring and analysis platform demonstrating:
 ### Prerequisites
 - Docker Desktop (or Docker Engine + Docker Compose)
 - At least 4GB of available RAM
-- Ports available: 5173, 3000, 1812, 1813, 53
+- Ports available: 5174, 3000, 1812, 1813, 53
 
 ### Installation
 
@@ -92,7 +92,7 @@ noc_router1       running
 noc_router2       running
 noc_radius        running   0.0.0.0:1812-1813->1812-1813/udp
 noc_scanner       running
-noc_dashboard     running   0.0.0.0:5173->5173/tcp
+noc_dashboard     running   0.0.0.0:5174->5174/tcp
 noc_dns           running   0.0.0.0:53->53/udp
 noc_client1       running
 noc_client2       running
