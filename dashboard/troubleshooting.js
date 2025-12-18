@@ -6,6 +6,34 @@
 const API_BASE_URL = 'http://localhost:8001/api';
 
 // ============================================================================
+// LOGGING UTILITIES
+// ============================================================================
+
+function addLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const prefix = type.toUpperCase();
+    console.log(`[${timestamp}] [${prefix}] ${message}`);
+    
+    // Also try to add to activity log if it exists
+    try {
+        const logViewer = document.getElementById('activityLog');
+        if (logViewer) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${timestamp}] [${prefix}] ${message}`;
+            logViewer.insertBefore(entry, logViewer.firstChild);
+            
+            // Keep only last 50 entries
+            while (logViewer.children.length > 50) {
+                logViewer.removeChild(logViewer.lastChild);
+            }
+        }
+    } catch (e) {
+        // Silently fail if activity log doesn't exist
+    }
+}
+
+// ============================================================================
 // INITIALIZATION
 // ============================================================================
 
@@ -532,15 +560,258 @@ function drawTopology() {
 }
 
 // ============================================================================
-// INITIALIZE ON PAGE LOAD
+// NETWORK ISSUE SIMULATOR
 // ============================================================================
 
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        initTroubleshooting();
-        drawTopology();
-    });
-} else {
-    initTroubleshooting();
-    drawTopology();
+const SIMULATED_ISSUES = {
+    'bgp-down': {
+        name: 'BGP Session Down',
+        severity: 'critical',
+        layer: 3,
+        description: 'BGP peer 10.0.2.2 is not responding',
+        expectedDiagnosis: 'Check BGP port 179 and peer configuration'
+    },
+    'radius-failure': {
+        name: 'RADIUS Authentication Failure',
+        severity: 'high',
+        layer: 7,
+        description: 'RADIUS server not responding to authentication requests',
+        expectedDiagnosis: 'Check RADIUS server connectivity on port 1812'
+    },
+    'dns-timeout': {
+        name: 'DNS Resolution Timeout',
+        severity: 'medium',
+        layer: 7,
+        description: 'DNS queries timing out (>2000ms response time)',
+        expectedDiagnosis: 'Check DNS server 10.0.1.11 on port 53'
+    },
+    'packet-loss': {
+        name: 'High Packet Loss on Link',
+        severity: 'high',
+        layer: 2,
+        description: '25% packet loss detected on 10.0.2.0/24 link',
+        expectedDiagnosis: 'Run ping test to measure packet loss percentage'
+    },
+    'interface-down': {
+        name: 'Interface Down',
+        severity: 'critical',
+        layer: 1,
+        description: 'Network interface eth1 on router1 is down',
+        expectedDiagnosis: 'Check physical connectivity and interface status'
+    }
+};
+
+let activeIssues = [];
+let issueState = {}; // Track which issues are simulated
+
+/**
+ * Simulate a network issue
+ */
+async function simulateIssue(issueType) {
+    const issue = SIMULATED_ISSUES[issueType];
+    if (!issue) {
+        console.error('Unknown issue type:', issueType);
+        return;
+    }
+    
+    // Check if already active
+    if (issueState[issueType]) {
+        addLog(`Issue already active: ${issue.name}`, 'warning');
+        return;
+    }
+    
+    // Create issue instance
+    const issueInstance = {
+        id: `${issueType}-${Date.now()}`,
+        type: issueType,
+        ...issue,
+        startTime: new Date(),
+        active: true
+    };
+    
+    activeIssues.push(issueInstance);
+    issueState[issueType] = true;
+    
+    // Log the issue
+    addLog(`🚨 Issue triggered: ${issue.name} (Severity: ${issue.severity})`, 'error');
+    
+    // Apply the simulation
+    applyIssueSimulation(issueType);
+    
+    // Update UI
+    updateIssuesList();
+    updateLayerHealth();
+    
+    // Show output in the UI
+    const outputEl = document.getElementById(`${issueType}-issue-output`);
+    if (outputEl) {
+        outputEl.innerHTML = `<strong style="color: #ff4444;">✓ Issue Active</strong><br>Started at ${issueInstance.startTime.toLocaleTimeString()}<br><em>${issue.description}</em>`;
+    }
 }
+
+/**
+ * Apply simulation logic based on issue type
+ */
+function applyIssueSimulation(issueType) {
+    // Save original fetch if needed
+    if (!window._originalFetch) {
+        window._originalFetch = window.fetch;
+    }
+    
+    // Create a wrapper that intercepts specific API calls
+    const originalFetch = window._originalFetch;
+    window.fetch = async function(...args) {
+        const url = args[0];
+        const options = args[1] || {};
+        
+        // Check which issues are active and modify responses accordingly
+        if (issueState['bgp-down'] && url.includes('/network/bgp/summary')) {
+            return new Response(JSON.stringify({
+                success: true,
+                router: 'router1',
+                local_as: 65001,
+                peers: [{ peer_ip: '10.0.2.2', state: 'Idle', peer_as: 65002 }],
+                count: 1,
+                timestamp: new Date().toISOString()
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        
+        if (issueState['radius-failure'] && url.includes('/radius/test')) {
+            return new Response(JSON.stringify({
+                success: false,
+                authenticated: false,
+                message: 'RADIUS server unreachable (timeout after 5000ms)',
+                response_time: 5000
+            }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        }
+        
+        if (issueState['dns-timeout'] && url.includes('/diagnostics/dns-lookup')) {
+            return new Response(JSON.stringify({
+                success: false,
+                resolved: false,
+                error: 'DNS query timeout',
+                query_time: 5000
+            }), { status: 408, headers: { 'Content-Type': 'application/json' } });
+        }
+        
+        if (issueState['packet-loss'] && url.includes('/diagnostics/ping')) {
+            return new Response(JSON.stringify({
+                success: true,
+                target: '10.0.2.1',
+                packet_loss_pct: 25,
+                avg_rtt: 45,
+                min_rtt: 30,
+                max_rtt: 120
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        
+        if (issueState['interface-down'] && url.includes('/network/interfaces')) {
+            return new Response(JSON.stringify({
+                success: true,
+                output: 'Interface eth1 is DOWN'
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        
+        // For all other requests, use original fetch
+        return originalFetch.apply(this, args);
+    };
+}
+
+/**
+ * Clear all active issues
+ */
+function clearAllIssues() {
+    if (activeIssues.length === 0) {
+        addLog('No active issues to clear', 'warning');
+        return;
+    }
+    
+    // Reset fetch to original
+    if (window._originalFetch) {
+        window.fetch = window._originalFetch;
+    }
+    
+    // Clear all issue state
+    activeIssues = [];
+    issueState = {};
+    
+    // Clear all issue output elements
+    Object.keys(SIMULATED_ISSUES).forEach(issueType => {
+        const outputEl = document.getElementById(`${issueType}-issue-output`);
+        if (outputEl) {
+            outputEl.innerHTML = '';
+        }
+    });
+    
+    addLog('✓ All simulated issues cleared', 'success');
+    updateIssuesList();
+    updateLayerHealth();
+}
+
+/**
+ * Update the active issues list display
+ */
+function updateIssuesList() {
+    const issuesList = document.getElementById('issues-list');
+    if (!issuesList) return;
+    
+    if (activeIssues.length === 0) {
+        issuesList.innerHTML = '<div class="no-issues">✅ No active issues detected</div>';
+        return;
+    }
+    
+    let html = '';
+    activeIssues.forEach(issue => {
+        const duration = new Date() - issue.startTime;
+        const seconds = Math.floor(duration / 1000);
+        
+        const severityColor = issue.severity === 'critical' ? '#ff4444' : 
+                             issue.severity === 'high' ? '#ffaa00' : '#ffdd00';
+        
+        html += `
+            <div class="issue-card issue-${issue.severity}" style="border-left: 4px solid ${severityColor}; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.05);">
+                <div class="issue-header">
+                    <strong style="color: ${severityColor};">${issue.name}</strong>
+                    <span class="issue-severity" style="background: ${severityColor}33; color: ${severityColor};">${issue.severity.toUpperCase()}</span>
+                </div>
+                <div style="font-size: 0.9em; color: #aaa; margin-top: 8px;">
+                    <div>Layer: L${issue.layer} | Active for: ${seconds}s</div>
+                    <div style="margin-top: 5px; color: #e0e0e0;">${issue.description}</div>
+                    <div style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.3); border-radius: 3px; font-size: 0.85em;">
+                        <strong>Expected diagnosis:</strong> ${issue.expectedDiagnosis}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    issuesList.innerHTML = html;
+}
+
+/**
+ * Update layer health based on active issues
+ */
+function updateLayerHealth() {
+    // Reset all layers to healthy
+    const layers = ['l1', 'l2', 'l3', 'l4', 'l5', 'l6', 'l7'];
+    layers.forEach(layer => {
+        const statusEl = document.getElementById(`${layer}-status`);
+        if (statusEl) {
+            statusEl.textContent = '✅ Healthy';
+            statusEl.style.color = '#00ff88';
+        }
+    });
+    
+    // Mark affected layers as unhealthy
+    activeIssues.forEach(issue => {
+        const layer = `l${issue.layer}`;
+        const statusEl = document.getElementById(`${layer}-status`);
+        if (statusEl) {
+            statusEl.textContent = '⚠️ Issue Detected';
+            statusEl.style.color = '#ffaa00';
+        }
+    });
+}
+
+// Update issues list every second
+setInterval(updateIssuesList, 1000);

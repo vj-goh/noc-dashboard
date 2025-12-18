@@ -513,6 +513,61 @@
             </div>
         </div>
 
+        <!-- Network Issue Simulator -->
+        <div class="section">
+            <h2>⚡ Network Issue Simulator</h2>
+            <p style="color: #888; margin-bottom: 15px;">Simulate network problems for testing and training</p>
+            <div class="tool-grid">
+                <!-- BGP Session Down -->
+                <div class="tool-card">
+                    <h3>🔴 BGP Session Down</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">BGP peer 10.0.2.2 becomes unreachable</p>
+                    <button class="btn" onclick="simulateIssue('bgp-down')">Trigger Issue</button>
+                    <div class="tool-output" id="bgp-issue-output"></div>
+                </div>
+
+                <!-- RADIUS Failure -->
+                <div class="tool-card">
+                    <h3>🔐 RADIUS Authentication Failure</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">RADIUS server stops responding</p>
+                    <button class="btn" onclick="simulateIssue('radius-failure')">Trigger Issue</button>
+                    <div class="tool-output" id="radius-issue-output"></div>
+                </div>
+
+                <!-- DNS Timeout -->
+                <div class="tool-card">
+                    <h3>⏱️ DNS Resolution Timeout</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">DNS queries timeout (>2000ms)</p>
+                    <button class="btn" onclick="simulateIssue('dns-timeout')">Trigger Issue</button>
+                    <div class="tool-output" id="dns-issue-output"></div>
+                </div>
+
+                <!-- Packet Loss -->
+                <div class="tool-card">
+                    <h3>📉 High Packet Loss on Link</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">25% packet loss between routers</p>
+                    <button class="btn" onclick="simulateIssue('packet-loss')">Trigger Issue</button>
+                    <div class="tool-output" id="packet-loss-issue-output"></div>
+                </div>
+
+                <!-- Interface Down -->
+                <div class="tool-card">
+                    <h3>⚠️ Interface Down</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Network interface becomes unreachable</p>
+                    <button class="btn" onclick="simulateIssue('interface-down')">Trigger Issue</button>
+                    <div class="tool-output" id="interface-issue-output"></div>
+                </div>
+
+                <!-- Clear All Issues -->
+                <div class="tool-card">
+                    <h3>🔄 Reset Environment</h3>
+                    <p style="font-size: 0.9em; color: #aaa; margin-bottom: 10px;">Stop all simulated issues</p>
+                    <button class="btn" style="background: rgba(0, 100, 100, 0.5);" onclick="clearAllIssues()">Clear Issues</button>
+                    <div class="tool-output" id="reset-output"></div>
+                </div>
+            </div>
+        </div>
+
         <!-- Active Issues -->
         <div class="section">
             <h2>🚨 Active Issues</h2>
@@ -594,6 +649,11 @@
             </div>
             <div class="capture-output" id="capture-results"></div>
         </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+        <a href="index.html" style="color: #00ff88; text-decoration: none; margin: 0 15px;">← Dashboard</a>
+        <a href="pcap-analysis.html" style="color: #00ff88; text-decoration: none; margin: 0 15px;">PCAP Analyzer →</a>
     </div>
 
     <script src="troubleshooting.js"></script>
