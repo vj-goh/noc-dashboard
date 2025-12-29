@@ -6,7 +6,9 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3000',
+        // Detect if running in Docker by checking if DOCKER_ENV env var is set
+        // In Docker, use the service hostname; otherwise use localhost for local dev
+        target: process.env.DOCKER_ENV === 'true' ? 'http://api:8000' : 'http://127.0.0.1:3000',
         changeOrigin: true
       }
     }

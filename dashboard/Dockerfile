@@ -22,4 +22,4 @@ COPY . .
 EXPOSE 5173 3000
 
 # Development mode by default
-CMD ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0"]
+CMD ["sh", "-c", "npm install && DOCKER_ENV=true npm run dev -- --host 0.0.0.0"]

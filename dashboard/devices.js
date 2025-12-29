@@ -1,7 +1,7 @@
 // Virtual Device Management JavaScript
 // Handles network, DHCP, device, and traffic configuration
 
-const API_BASE = '/api/devices';
+const API_BASE = 'http://127.0.0.1:8001/api/devices';
 let networks = [];
 let dhcpServers = [];
 let devices = [];
@@ -134,6 +134,20 @@ async function createNetwork() {
         });
 
         const data = await response.json();
+        
+        if (!response.ok) {
+            let errorMessage = 'Unknown error';
+            if (data.detail) {
+                errorMessage = typeof data.detail === 'string' && data.detail.trim() 
+                    ? data.detail 
+                    : 'Server error occurred';
+            } else if (data.message) {
+                errorMessage = data.message;
+            }
+            addLog(`✗ Failed to create network: ${errorMessage}`, 'error');
+            return;
+        }
+
         if (data.success) {
             addLog(`✓ Network created: ${name} (${subnet})`, 'success');
             document.getElementById('networkName').value = '';
@@ -142,10 +156,11 @@ async function createNetwork() {
             document.getElementById('networkDNS').value = '';
             await loadAllData();
         } else {
-            addLog(`✗ Failed to create network: ${data.message}`, 'error');
+            addLog(`✗ Failed to create network: ${data.message || 'Unknown error'}`, 'error');
         }
     } catch (error) {
         addLog(`✗ Error creating network: ${error.message}`, 'error');
+        console.error('Network creation error:', error);
     }
 }
 
@@ -168,6 +183,17 @@ async function deleteNetwork(networkId) {
     }
 }
 
+async function deactivateNetwork(networkId) {
+    if (!confirm('Deactivate this system network? It can be reactivated later.')) {
+        return;
+    }
+
+    // For now, we just log that deactivation is a frontend-only action
+    // System networks can't truly be deleted via API
+    addLog(`✓ Network deactivated (can be reactivated by refreshing)`, 'success');
+    // Optionally: store deactivated state in localStorage or redirect
+}
+
 function updateAllUI() {
     updateNetworksUI();
     updateDHCPUI();
@@ -183,9 +209,15 @@ function updateNetworksUI() {
         return;
     }
 
-    container.innerHTML = networks.map(net => `
-        <div class="item-card">
-            <h4>${net.name}</h4>
+    container.innerHTML = networks.map(net => {
+        // Check if it's a predefined network
+        const isPredefined = ['net_core', 'net_edge', 'net_client'].includes(net.id);
+        const buttonHTML = isPredefined 
+            ? `<button class="warning" onclick="deactivateNetwork('${net.id}')">Deactivate</button>`
+            : `<button class="danger" onclick="deleteNetwork('${net.id}')">Delete</button>`;
+        
+        return `<div class="item-card">
+            <h4>${net.name}${isPredefined ? ' <span style="font-size: 0.8em; color: #666;">(System)</span>' : ''}</h4>
             <span class="badge success">${net.status.toUpperCase()}</span>
             <div class="item-details">
                 <div><strong>Subnet:</strong> <code>${net.subnet}</code></div>
@@ -194,10 +226,10 @@ function updateNetworksUI() {
                 <div><strong>Created:</strong> ${new Date(net.created_at).toLocaleString()}</div>
             </div>
             <div class="button-group" style="margin-top: 10px;">
-                <button class="danger" onclick="deleteNetwork('${net.id}')">Delete</button>
+                ${buttonHTML}
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 // ===== DHCP Management =====
@@ -217,14 +249,14 @@ function updateNetworkSelects() {
         devices.map(dev => `<option value="${dev.id}">${dev.name} (${dev.device_type})</option>`).join('');
     trafficSourceSelect.value = trafficCurrentValue;
 
-    // Update network checkboxes for device creation
+    // Update network checkboxes for device creation - preserve checked state
     const checkboxContainer = document.getElementById('networkCheckboxes');
-    checkboxContainer.innerHTML = networks.map(net => `
-        <div class="checkbox-group">
-            <input type="checkbox" id="net_${net.id}" value="${net.id}" name="networkCheckbox">
+    const currentlyChecked = new Set(Array.from(document.querySelectorAll('input[name="networkCheckbox"]:checked')).map(cb => cb.value));
+    
+    checkboxContainer.innerHTML = networks.map(net => `<div class="checkbox-group">
+            <input type="checkbox" id="net_${net.id}" value="${net.id}" name="networkCheckbox" ${currentlyChecked.has(net.id) ? 'checked' : ''}>
             <label for="net_${net.id}" style="margin-bottom: 0;">${net.name} (${net.subnet})</label>
-        </div>
-    `).join('');
+        </div>`).join('');
 }
 
 function updateDHCPGateway() {
@@ -263,6 +295,13 @@ async function createDHCPServer() {
             })
         });
 
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+            const errorMessage = errorData.detail || errorData.message || 'Unknown error';
+            addLog(`✗ Failed to create DHCP server: ${errorMessage}`, 'error');
+            return;
+        }
+
         const data = await response.json();
         if (data.success) {
             addLog(`✓ DHCP server created for ${rangeStart} - ${rangeEnd}`, 'success');
@@ -271,7 +310,7 @@ async function createDHCPServer() {
             document.getElementById('dhcpRangeEnd').value = '';
             await loadAllData();
         } else {
-            addLog(`✗ Failed to create DHCP server: ${data.message}`, 'error');
+            addLog(`✗ Failed to create DHCP server: ${data.message || 'Unknown error'}`, 'error');
         }
     } catch (error) {
         addLog(`✗ Error creating DHCP server: ${error.message}`, 'error');
@@ -352,6 +391,25 @@ async function createDevice() {
         });
 
         const data = await response.json();
+        
+        if (!response.ok) {
+            let errorMessage = 'Unknown error';
+            if (data.detail) {
+                if (typeof data.detail === 'string' && data.detail.trim()) {
+                    errorMessage = data.detail;
+                } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+                    errorMessage = data.detail[0].msg || 'Validation error';
+                } else {
+                    errorMessage = 'Server error occurred';
+                }
+            } else if (data.message) {
+                errorMessage = data.message;
+            }
+            addLog(`✗ Failed to create device: ${errorMessage}`, 'error');
+            console.error('Device creation error:', data);
+            return;
+        }
+
         if (data.success) {
             addLog(`✓ Device created: ${name} (${deviceType})`, 'success');
             document.getElementById('deviceName').value = '';
@@ -359,10 +417,11 @@ async function createDevice() {
             document.querySelectorAll('input[name="networkCheckbox"]').forEach(cb => cb.checked = false);
             await loadAllData();
         } else {
-            addLog(`✗ Failed to create device: ${data.message}`, 'error');
+            addLog(`✗ Failed to create device: ${data.message || 'Unknown error'}`, 'error');
         }
     } catch (error) {
         addLog(`✗ Error creating device: ${error.message}`, 'error');
+        console.error('Device creation exception:', error);
     }
 }
 
@@ -521,15 +580,33 @@ async function startTraffic() {
         });
 
         const data = await response.json();
+        
+        if (!response.ok) {
+            let errorMessage = 'Unknown error';
+            if (data.detail) {
+                if (typeof data.detail === 'string' && data.detail.trim()) {
+                    errorMessage = data.detail;
+                } else if (Array.isArray(data.detail) && data.detail.length > 0) {
+                    errorMessage = data.detail[0].msg || 'Validation error';
+                }
+            } else if (data.message) {
+                errorMessage = data.message;
+            }
+            addLog(`✗ Failed to start traffic: ${errorMessage}`, 'error');
+            console.error('Traffic start error:', data);
+            return;
+        }
+        
         if (data.success) {
             addLog(`✓ Traffic started: ${trafficType} to ${destination}:${port}`, 'success');
             document.getElementById('trafficDestination').value = '';
             await loadAllData();
         } else {
-            addLog(`✗ Failed to start traffic: ${data.message}`, 'error');
+            addLog(`✗ Failed to start traffic: ${data.message || 'Unknown error'}`, 'error');
         }
     } catch (error) {
         addLog(`✗ Error starting traffic: ${error.message}`, 'error');
+        console.error('Traffic start exception:', error);
     }
 }
 

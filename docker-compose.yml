@@ -154,7 +154,8 @@ services:
       - ./dashboard:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8001/api  # ← FIXED! Was 8000, now 8001
+      - VITE_API_URL=http://api:8000/api
+      - DOCKER_ENV=true
     networks:
       core_network:
         ipv4_address: 10.0.1.30
